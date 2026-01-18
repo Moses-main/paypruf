@@ -1,14 +1,15 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   History, 
   Search, 
   ExternalLink, 
   FileText, 
-  Share2,
   Copy,
   Check,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Eye
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -138,30 +139,12 @@ export const TransactionHistory = ({
                       <p className="text-sm font-mono break-all">{tx.hash}</p>
                     </div>
                     <div className="flex flex-wrap gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const proof = onGenerateProof(tx);
-                          onDownload(proof, 'json');
-                        }}
-                      >
-                        <FileText className="h-3 w-3" />
-                        Download JSON
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const proof = onGenerateProof(tx);
-                          onDownload(proof, 'xml');
-                        }}
-                      >
-                        <FileText className="h-3 w-3" />
-                        Download XML
-                      </Button>
+                      <Link to={`/proof/${tx.id}`} onClick={(e) => e.stopPropagation()}>
+                        <Button variant="gradient" size="sm">
+                          <Eye className="h-3 w-3" />
+                          View Proof
+                        </Button>
+                      </Link>
                       <Button
                         variant="outline"
                         size="sm"
@@ -182,11 +165,23 @@ export const TransactionHistory = ({
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
+                          const proof = onGenerateProof(tx);
+                          onDownload(proof, 'json');
+                        }}
+                      >
+                        <FileText className="h-3 w-3" />
+                        Download ISO
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
                           window.open(`https://flarescan.com/tx/${tx.hash}`, '_blank');
                         }}
                       >
                         <ExternalLink className="h-3 w-3" />
-                        View on Explorer
+                        Explorer
                       </Button>
                     </div>
                   </div>

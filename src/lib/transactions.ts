@@ -45,6 +45,8 @@ export const generateProofRecord = (tx: Transaction, senderAddress: string): Pro
     currency: 'USDT0',
     proofId: `PROOF-${Date.now()}-${tx.id}`,
     generatedAt: new Date().toISOString(),
+    acknowledged: tx.acknowledged || false,
+    acknowledgedAt: tx.acknowledgedAt,
   };
 };
 
