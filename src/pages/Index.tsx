@@ -7,13 +7,16 @@ import { useWallet } from '@/hooks/useWallet';
 import { Transaction, ProofRecord } from '@/types/transaction';
 import { generateMockTransactions, generateProofRecord } from '@/lib/transactions';
 import { Coins, Shield, Zap } from 'lucide-react';
+import { toast } from 'sonner';
 
 const Index = () => {
   const wallet = useWallet();
   const [transactions, setTransactions] = useState<Transaction[]>(generateMockTransactions());
+  const [proofCache, setProofCache] = useState<Map<string, ProofRecord>>(new Map());
 
   const handleSendPayment = useCallback(async (data: Omit<Transaction, 'id' | 'hash' | 'timestamp' | 'status'>) => {
-    // Simulate transaction processing
+    // Simulate transaction processing with confirmation
+    toast.loading('Processing payment...', { id: 'payment' });
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     const newTx: Transaction = {
@@ -26,14 +29,22 @@ const Index = () => {
       memo: data.memo,
       timestamp: new Date(),
       status: 'confirmed',
+      acknowledged: false,
     };
     
     setTransactions(prev => [newTx, ...prev]);
+    toast.success('Payment confirmed!', { id: 'payment' });
   }, []);
 
   const handleGenerateProof = useCallback((tx: Transaction): ProofRecord => {
-    return generateProofRecord(tx, wallet.address || '');
-  }, [wallet.address]);
+    // Check cache first
+    const cached = proofCache.get(tx.id);
+    if (cached) return cached;
+    
+    const proof = generateProofRecord(tx, wallet.address || '0x0000000000000000000000000000000000000000');
+    setProofCache(prev => new Map(prev).set(tx.id, proof));
+    return proof;
+  }, [wallet.address, proofCache]);
 
   const handleDownload = useCallback((proof: ProofRecord, format: 'json' | 'xml') => {
     let content: string;
@@ -46,17 +57,17 @@ const Index = () => {
       extension = 'json';
     } else {
       content = `<?xml version="1.0" encoding="UTF-8"?>
-<ProofRecord>
+<ProofRecord xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.03">
   <ProofId>${proof.proofId}</ProofId>
   <TransactionHash>${proof.hash}</TransactionHash>
-  <Amount>${proof.amount}</Amount>
-  <Currency>${proof.currency}</Currency>
+  <Amount currency="${proof.currency}">${proof.amount}</Amount>
   <Sender>${proof.sender}</Sender>
   <Recipient>${proof.recipient}</Recipient>
   <Memo>${proof.memo}</Memo>
   <Timestamp>${proof.timestamp}</Timestamp>
   <Network>${proof.network}</Network>
   <GeneratedAt>${proof.generatedAt}</GeneratedAt>
+  <Acknowledged>${proof.acknowledged || false}</Acknowledged>
 </ProofRecord>`;
       mimeType = 'application/xml';
       extension = 'xml';
@@ -69,6 +80,7 @@ const Index = () => {
     a.download = `proof-${proof.proofId}.${extension}`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success(`Downloaded ${format.toUpperCase()} proof`);
   }, []);
 
   const handleShare = useCallback((tx: Transaction): string => {
@@ -95,10 +107,10 @@ const Index = () => {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-3xl md:text-4xl font-bold mb-3">
-            <span className="gradient-text">Proof-of-Payment</span> on Flare
+            <span className="gradient-text">PayProof</span> on Flare
           </h1>
           <p className="text-muted-foreground max-w-lg mx-auto">
-            Send USDT0 payments with verifiable, shareable, and ISO-compliant payment records
+            Send USDT0 payments with verifiable, shareable, and ISO-compliant payment proofs
           </p>
         </div>
 
@@ -138,7 +150,7 @@ const Index = () => {
 
       <footer className="container px-4 py-8 text-center">
         <p className="text-xs text-muted-foreground">
-          Built on Flare Network • USDT0 Stablecoin • ProofRails Protocol
+          Built on Flare Network • USDT0 Stablecoin • PayProof Protocol
         </p>
       </footer>
     </div>

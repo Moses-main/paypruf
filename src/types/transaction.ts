@@ -6,6 +6,8 @@ export interface Transaction {
   memo: string;
   timestamp: Date;
   status: 'pending' | 'confirmed' | 'failed';
+  acknowledged?: boolean;
+  acknowledgedAt?: string;
 }
 
 export interface ProofRecord {
@@ -20,4 +22,6 @@ export interface ProofRecord {
   currency: string;
   proofId: string;
   generatedAt: string;
+  acknowledged?: boolean;
+  acknowledgedAt?: string;
 }
