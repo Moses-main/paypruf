@@ -1,0 +1,43 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id                  String   @id @default(uuid())
+  transactionHash     String   @unique
+  senderAddress       String
+  sender              User     @relation("SentPayments", fields: [senderAddress], references: [walletAddress], onDelete: Cascade)
+  recipientAddress    String
+  recipient          User?    @relation("ReceivedPayments", fields: [recipientAddress], references: [walletAddress], onDelete: SetNull)
+  amount              String   // Storing as string to handle large numbers
+  currency            String   @default("USDT0")
+  memo                String?
+  proofRailsRecordId  String?
+  proofHash           String?
+  flareAnchorTxHash   String?  @unique
+  status              String   @default("PENDING") // PENDING, COMPLETED, FAILED
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([senderAddress])
+  @@index([recipientAddress])
+  @@index([createdAt])
+}
+
+model User {
+  id                String    @id @default(uuid())
+  walletAddress     String    @unique
+  xrplAddress       String?   @unique
+  sentPayments      Payment[] @relation("SentPayments")
+  receivedPayments  Payment[] @relation("ReceivedPayments")
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
