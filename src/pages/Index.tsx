@@ -99,7 +99,9 @@ const Index = () => {
           isConnecting={wallet.isConnecting}
           address={wallet.address}
           onConnect={wallet.connect}
+          onConnectWalletConnect={wallet.connectWalletConnect}
           onDisconnect={wallet.disconnect}
+          hasInjectedWallet={wallet.hasInjectedWallet}
         />
       </Header>
 

@@ -1,14 +1,16 @@
 import { Wallet, LogOut, ChevronDown, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatAddress } from '@/lib/transactions';
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface WalletConnectProps {
   isConnected: boolean;
   isConnecting: boolean;
   address: string | null;
   onConnect: () => void;
+  onConnectWalletConnect?: () => void;
   onDisconnect: () => void;
+  hasInjectedWallet?: boolean;
 }
 
 export const WalletConnect = ({
@@ -16,10 +18,14 @@ export const WalletConnect = ({
   isConnecting,
   address,
   onConnect,
+  onConnectWalletConnect,
   onDisconnect,
+  hasInjectedWallet = true,
 }: WalletConnectProps) => {
   const [copied, setCopied] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showConnectOptions, setShowConnectOptions] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleCopy = async () => {
     if (address) {
@@ -29,31 +35,88 @@ export const WalletConnect = ({
     }
   };
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+        setShowConnectOptions(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   if (!isConnected) {
     return (
-      <Button
-        variant="gradient"
-        onClick={onConnect}
-        disabled={isConnecting}
-        className="gap-2"
-      >
-        {isConnecting ? (
-          <>
-            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-            Connecting...
-          </>
-        ) : (
-          <>
-            <Wallet className="h-4 w-4" />
-            Connect Wallet
-          </>
+      <div className="relative" ref={dropdownRef}>
+        <Button
+          variant="gradient"
+          onClick={() => {
+            if (onConnectWalletConnect && !hasInjectedWallet) {
+              // No MetaMask, show options or direct WalletConnect
+              setShowConnectOptions(true);
+            } else {
+              onConnect();
+            }
+          }}
+          disabled={isConnecting}
+          className="gap-2"
+        >
+          {isConnecting ? (
+            <>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
+              Connecting...
+            </>
+          ) : (
+            <>
+              <Wallet className="h-4 w-4" />
+              Connect Wallet
+            </>
+          )}
+        </Button>
+
+        {showConnectOptions && !isConnecting && (
+          <div className="absolute right-0 top-full mt-2 w-56 glass-card p-2 z-50 animate-fade-in">
+            <button
+              onClick={() => {
+                onConnect();
+                setShowConnectOptions(false);
+              }}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-secondary transition-colors"
+            >
+              <img
+                src="https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg"
+                alt="MetaMask"
+                className="h-5 w-5"
+              />
+              MetaMask
+            </button>
+            {onConnectWalletConnect && (
+              <button
+                onClick={() => {
+                  onConnectWalletConnect();
+                  setShowConnectOptions(false);
+                }}
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-sm hover:bg-secondary transition-colors"
+              >
+                <img
+                  src="https://registry.walletconnect.org/v2/logo/sm/c57ca95b47569778a828d19178114f4db188b89b763c899ba0be274e97267d96?projectId=3fcc6bba6f1de962d911bb5b5c3dba68"
+                  alt="WalletConnect"
+                  className="h-5 w-5 rounded"
+                />
+                WalletConnect
+              </button>
+            )}
+          </div>
         )}
-      </Button>
+      </div>
     );
   }
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <Button
         variant="outline"
         onClick={() => setShowDropdown(!showDropdown)}

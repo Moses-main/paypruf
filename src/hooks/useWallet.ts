@@ -1,47 +1,51 @@
-import { useState, useCallback } from 'react';
-
-interface WalletState {
-  isConnected: boolean;
-  address: string | null;
-  isConnecting: boolean;
-}
+import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useCallback, useMemo } from 'react';
 
 export const useWallet = () => {
-  const [state, setState] = useState<WalletState>({
-    isConnected: false,
-    address: null,
-    isConnecting: false,
-  });
+  const { address, isConnected, isConnecting, isReconnecting } = useAccount();
+  const { connect, connectors, isPending } = useConnect();
+  const { disconnect } = useDisconnect();
 
-  const connect = useCallback(async () => {
-    setState(prev => ({ ...prev, isConnecting: true }));
-    
-    // Simulate wallet connection
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Generate a mock address
-    const mockAddress = '0x' + Array.from({ length: 40 }, () => 
-      Math.floor(Math.random() * 16).toString(16)
-    ).join('');
-    
-    setState({
-      isConnected: true,
-      address: mockAddress,
-      isConnecting: false,
-    });
-  }, []);
+  // Get available connectors
+  const injectedConnector = useMemo(
+    () => connectors.find((c) => c.id === 'injected'),
+    [connectors]
+  );
+  const walletConnectConnector = useMemo(
+    () => connectors.find((c) => c.id === 'walletConnect'),
+    [connectors]
+  );
 
-  const disconnect = useCallback(() => {
-    setState({
-      isConnected: false,
-      address: null,
-      isConnecting: false,
-    });
-  }, []);
+  const connectInjected = useCallback(() => {
+    if (injectedConnector) {
+      connect({ connector: injectedConnector });
+    }
+  }, [connect, injectedConnector]);
+
+  const connectWalletConnect = useCallback(() => {
+    if (walletConnectConnector) {
+      connect({ connector: walletConnectConnector });
+    }
+  }, [connect, walletConnectConnector]);
+
+  // Default connect - prefer injected (MetaMask), fallback to WalletConnect
+  const connectDefault = useCallback(() => {
+    if (injectedConnector) {
+      connect({ connector: injectedConnector });
+    } else if (walletConnectConnector) {
+      connect({ connector: walletConnectConnector });
+    }
+  }, [connect, injectedConnector, walletConnectConnector]);
 
   return {
-    ...state,
-    connect,
+    isConnected,
+    isConnecting: isConnecting || isReconnecting || isPending,
+    address: address || null,
+    connect: connectDefault,
+    connectInjected,
+    connectWalletConnect,
     disconnect,
+    hasInjectedWallet: !!injectedConnector,
+    hasWalletConnect: !!walletConnectConnector,
   };
 };
