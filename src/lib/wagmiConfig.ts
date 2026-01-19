@@ -47,8 +47,8 @@ export const coston2 = defineChain({
   testnet: true,
 });
 
-// WalletConnect project ID - users should replace with their own
-const WALLETCONNECT_PROJECT_ID = '3fcc6bba6f1de962d911bb5b5c3dba68';
+// WalletConnect project ID - using environment variable with fallback
+const WALLETCONNECT_PROJECT_ID = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID || '3fcc6bba6f1de962d911bb5b5c3dba68';
 
 export const wagmiConfig = createConfig({
   chains: [flare, coston2],
