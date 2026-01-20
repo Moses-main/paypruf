@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { 
   History, 
   Search, 
@@ -7,12 +6,9 @@ import {
   FileText, 
   Copy,
   Check,
-  ChevronDown,
-  ChevronUp,
   Eye,
   Loader2,
-  AlertCircle,
-  ExternalLinkIcon
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,6 +19,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { formatDistanceToNow } from 'date-fns';
 import { PaymentResponse, ProofRecord } from '@/lib/api';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 // Helper function to format wallet address
 export const formatAddress = (address: string) => {
@@ -58,7 +55,10 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
   const [proofs, setProofs] = useState<Record<string, ProofRecord>>({});
   const [verificationResults, setVerificationResults] = useState<Record<string, { valid: boolean; message: string }>>({});
 
-  const filteredTransactions = payments.filter(tx => 
+  // Ensure payments is an array
+  const paymentsArray = Array.isArray(payments) ? payments : [];
+
+  const filteredTransactions = paymentsArray.filter((tx: PaymentResponse) => 
     tx.id.toLowerCase().includes(search.toLowerCase()) ||
     tx.recipientAddress.toLowerCase().includes(search.toLowerCase()) ||
     tx.senderAddress.toLowerCase().includes(search.toLowerCase()) ||
@@ -127,7 +127,6 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
       content = JSON.stringify(proof, null, 2);
       filename = `proof-${paymentId}.json`;
     } else {
-      // Simple XML conversion for the proof
       content = `<?xml version="1.0" encoding="UTF-8"?>
 <proof>
   <id>${proof.id}</id>
@@ -153,7 +152,6 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
 
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline' | 'success', label: string }> = {
-      confirmed: 'bg-success/20 text-success border-success/30',
       PENDING: { variant: 'secondary', label: 'Pending' },
       COMPLETED: { variant: 'success', label: 'Completed' },
       FAILED: { variant: 'destructive', label: 'Failed' },
@@ -173,12 +171,12 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
     );
   }
 
-  if (payments.length === 0) {
+  if (paymentsArray.length === 0) {
     return (
       <div className="text-center p-8 text-muted-foreground">
-        <History className="mx-auto h-12 w-12 text-gray-400" />
+        <History className="mx-auto h-12 w-12 text-muted-foreground/50" />
         <h3 className="mt-2 text-sm font-medium">No transactions yet</h3>
-        <p className="mt-1 text-sm text-gray-500">Your payment history will appear here</p>
+        <p className="mt-1 text-sm text-muted-foreground">Your payment history will appear here</p>
       </div>
     );
   }
@@ -206,7 +204,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
       
       <CardContent className="p-0">
         <div className="divide-y">
-          {filteredTransactions.map((tx) => {
+          {filteredTransactions.map((tx: PaymentResponse) => {
             const isSender = tx.senderAddress.toLowerCase() === walletAddress?.toLowerCase();
             const proof = proofs[tx.id];
             const verificationResult = verificationResults[tx.id];
@@ -248,7 +246,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <div className="text-xs font-medium text-muted-foreground mb-1">
-                          Transaction ID
+                          Payment ID
                         </div>
                         <div className="font-mono text-sm flex items-center">
                           {tx.id.slice(0, 8)}...{tx.id.slice(-4)}
@@ -281,7 +279,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                               onClick={(e) => e.stopPropagation()}
                             >
                               {formatAddress(tx.transactionHash)}
-                              <ExternalLinkIcon className="h-3.5 w-3.5 ml-1" />
+                              <ExternalLink className="h-3.5 w-3.5 ml-1" />
                             </a>
                           </div>
                         </div>
@@ -318,7 +316,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                               )}
                             </div>
                             
-                            <div className="flex space-x-2 pt-1">
+                            <div className="flex flex-wrap gap-2 pt-1">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -328,8 +326,8 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                                 }}
                                 disabled={!proof.id}
                               >
-                                <Check className="h-4 w-4 mr-2" />
-                                Verify Proof
+                                <Shield className="h-4 w-4 mr-2" />
+                                Verify
                               </Button>
                               
                               <Button
@@ -341,7 +339,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                                 }}
                               >
                                 <FileText className="h-4 w-4 mr-2" />
-                                Download JSON
+                                JSON
                               </Button>
                               
                               <Button
@@ -353,7 +351,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                                 }}
                               >
                                 <FileText className="h-4 w-4 mr-2" />
-                                Download XML
+                                XML
                               </Button>
                             </div>
                           </div>
@@ -361,7 +359,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                       )}
                     </div>
                     
-                    <div className="flex justify-between pt-2">
+                    <div className="flex flex-wrap gap-2 pt-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -383,7 +381,21 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                         )}
                       </Button>
                       
-                      {!proof && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        asChild
+                      >
+                        <Link 
+                          to={`/proof/${tx.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Proof
+                        </Link>
+                      </Button>
+                      
+                      {!proof && tx.status === 'COMPLETED' && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -400,29 +412,10 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                             </>
                           ) : (
                             <>
-                              <FileText className="h-4 w-4 mr-2" />
+                              <Shield className="h-4 w-4 mr-2" />
                               Generate Proof
                             </>
                           )}
-                        </Button>
-                      )}
-                      
-                      {proof?.verificationUrl && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          asChild
-                        >
-                          <a 
-                            href={proof.verificationUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => e.stopPropagation()}
-                            className="flex items-center"
-                          >
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View on ProofRails
-                          </a>
                         </Button>
                       )}
                     </div>
