@@ -152,10 +152,14 @@ export const PaymentForm = ({ onSuccess, className }: PaymentFormProps) => {
           recipientAddress,
           amount: numAmount.toString(),
           memo: formData.memo,
+          transactionHash: hash,
         });
         
-        // Start polling for proof generation status
-        if (paymentResponse?.id) {
+        // Set completed payment for confirmation screen
+        setCompletedPayment(paymentResponse);
+        
+        // Start polling for proof generation status (only if backend available)
+        if (paymentResponse?.id && !paymentResponse.id.startsWith('local-')) {
           setPollingPaymentId(paymentResponse.id);
           setCurrentStep('generating-proof');
         } else {
