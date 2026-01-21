@@ -2,26 +2,34 @@ import { useCallback } from 'react';
 import { paymentApi, PaymentRequest, PaymentResponse, ProofRecord } from '@/lib/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useWallet } from '@/hooks/useWallet';
 
 export const usePayments = () => {
   const queryClient = useQueryClient();
+  const { address } = useWallet();
 
-  // Fetch all payments for the current user
+  // Fetch payment history for the connected wallet
   const { 
-    data: payments = [], 
+    data: paymentsData, 
     isLoading: isLoadingPayments, 
     error: paymentsError,
     refetch: refetchPayments,
-  } = useQuery<PaymentResponse[], Error>({
-    queryKey: ['payments'],
-    queryFn: () => paymentApi.getUserPayments(),
+  } = useQuery({
+    queryKey: ['payments', address],
+    queryFn: () => address ? paymentApi.getPaymentHistory(address) : Promise.resolve({ payments: [], total: 0 }),
+    enabled: !!address,
   });
 
+  const payments = paymentsData?.payments ?? [];
+
   // Create a new payment
-  const createPaymentMutation = useMutation<PaymentResponse, Error, PaymentRequest>({
-    mutationFn: (paymentData) => paymentApi.createPayment(paymentData),
+  const createPaymentMutation = useMutation({
+    mutationFn: (paymentData: PaymentRequest) => {
+      if (!address) throw new Error('Wallet not connected');
+      return paymentApi.createPayment({ ...paymentData, senderAddress: address });
+    },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['payments', address] });
       toast.success('Payment successful', {
         description: `Payment of ${data.amount} sent to ${data.recipientAddress.slice(0, 8)}...`,
       });
