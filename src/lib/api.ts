@@ -66,9 +66,9 @@ export interface ProofRecord {
 }
 
 export const paymentApi = {
-  // Process a new payment
-  async createPayment(payment: PaymentRequest): Promise<PaymentResponse> {
-    const response = await api.post<PaymentResponse>('/payments', payment);
+  // Submit a new payment
+  async createPayment(payment: PaymentRequest & { senderAddress: string }): Promise<PaymentResponse> {
+    const response = await api.post<PaymentResponse>('/payments/submit', payment);
     return response.data;
   },
 
@@ -78,9 +78,9 @@ export const paymentApi = {
     return response.data;
   },
 
-  // Get all payments for the current user
-  async getUserPayments(): Promise<PaymentResponse[]> {
-    const response = await api.get<PaymentResponse[]>('/payments');
+  // Get payment history for a wallet address
+  async getPaymentHistory(walletAddress: string): Promise<{ payments: PaymentResponse[]; total: number }> {
+    const response = await api.get<{ payments: PaymentResponse[]; total: number }>(`/payments/history/${walletAddress}`);
     return response.data;
   },
 
