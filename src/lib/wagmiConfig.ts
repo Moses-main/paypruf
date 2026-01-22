@@ -51,10 +51,8 @@ export const coston2 = defineChain({
   testnet: true,
 });
 
-// Active chains (mainnet + testnet in dev)
-export const supportedChains = import.meta.env.DEV 
-  ? [flare, coston2] as const
-  : [flare] as const;
+// Active chains - include both mainnet and testnet for demo purposes
+export const supportedChains = [coston2, flare] as const;
 
 // WalletConnect configuration
 const WALLETCONNECT_PROJECT_ID = getEnv('VITE_WALLETCONNECT_PROJECT_ID', '3fcc6bba6f1de962d911bb5b5c3dba68');

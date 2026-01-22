@@ -12,7 +12,7 @@ import { useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
 import { parseEther, isAddress } from 'viem';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { PaymentResponse } from '@/lib/api';
+import { PaymentResponse, BLOCK_EXPLORER_URL } from '@/lib/api';
 
 interface PaymentFormProps {
   onSuccess?: () => void;
@@ -254,7 +254,7 @@ export const PaymentForm = ({ onSuccess, className }: PaymentFormProps) => {
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Tx Hash</span>
                   <a 
-                    href={`https://flare-explorer.flare.network/tx/${completedPayment?.transactionHash || txHash}`}
+                    href={`${BLOCK_EXPLORER_URL}/tx/${completedPayment?.transactionHash || txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-mono text-xs text-primary hover:underline"

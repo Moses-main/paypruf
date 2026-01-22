@@ -18,7 +18,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import api from '@/lib/api';
+import api, { BLOCK_EXPLORER_URL } from '@/lib/api';
 
 interface ProofData {
   id: string;
@@ -238,7 +238,7 @@ export function ProofView() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Payment Transaction</p>
                   <a
-                    href={`https://flarescan.com/tx/${proof.transactionHash}`}
+                    href={`${BLOCK_EXPLORER_URL}/tx/${proof.transactionHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm font-mono text-primary hover:underline"
@@ -253,7 +253,7 @@ export function ProofView() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Anchor Transaction</p>
                   <a
-                    href={`https://flarescan.com/tx/${proof.flareAnchorTxHash}`}
+                    href={`${BLOCK_EXPLORER_URL}/tx/${proof.flareAnchorTxHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 text-sm font-mono text-primary hover:underline"

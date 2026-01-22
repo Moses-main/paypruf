@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { usePayments } from '@/hooks/usePayments';
 import { useWallet } from '@/hooks/useWallet';
 import { formatDistanceToNow } from 'date-fns';
-import { PaymentResponse, ProofRecord } from '@/lib/api';
+import { PaymentResponse, ProofRecord, BLOCK_EXPLORER_URL } from '@/lib/api';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 
@@ -272,7 +272,7 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                           </div>
                           <div className="font-mono text-sm flex items-center">
                             <a 
-                              href={`https://flare-explorer.flare.network/tx/${tx.transactionHash}`}
+                              href={`${BLOCK_EXPLORER_URL}/tx/${tx.transactionHash}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex items-center text-primary hover:underline"

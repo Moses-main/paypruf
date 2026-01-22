@@ -1,6 +1,10 @@
 import axios, { AxiosInstance } from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// Production backend on Render
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://paypruf.onrender.com/api';
+
+// Coston2 Testnet block explorer
+export const BLOCK_EXPLORER_URL = 'https://coston2-explorer.flare.network';
 
 // Check if backend is available
 let backendAvailable: boolean | null = null;
@@ -10,8 +14,8 @@ const api: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true,
-  timeout: 5000, // 5 second timeout
+  withCredentials: false, // Disabled for cross-origin requests
+  timeout: 15000, // 15 second timeout for Render cold starts
 });
 
 // Request interceptor for adding auth token if available
