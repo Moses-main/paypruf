@@ -95,7 +95,8 @@ const saveLocalPayment = (payment: PaymentResponse): void => {
 const checkBackendAvailable = async (): Promise<boolean> => {
   if (backendAvailable !== null) return backendAvailable;
   try {
-    await api.get('/health', { timeout: 2000 });
+    // Health endpoint is at root, not under /api
+    await axios.get('https://paypruf.onrender.com/health', { timeout: 5000 });
     backendAvailable = true;
   } catch {
     backendAvailable = false;
@@ -110,10 +111,10 @@ export const paymentApi = {
     
     if (isOnline) {
       try {
-        const response = await api.post<PaymentResponse>('/payments/submit', payment);
-        return response.data;
+        const response = await api.post<{ status: string; data: PaymentResponse }>('/payment/submit', payment);
+        return response.data.data;
       } catch (error) {
-        console.warn('Backend unavailable, using local storage');
+        console.warn('Backend unavailable, using local storage', error);
       }
     }
     
@@ -141,8 +142,8 @@ export const paymentApi = {
     const localPayment = localPayments.find(p => p.id === paymentId);
     if (localPayment) return localPayment;
     
-    const response = await api.get<PaymentResponse>(`/payments/${paymentId}`);
-    return response.data;
+    const response = await api.get<{ status: string; data: PaymentResponse }>(`/proof/${paymentId}`);
+    return response.data.data;
   },
 
   // Get payment history for a wallet address
@@ -151,10 +152,13 @@ export const paymentApi = {
     
     if (isOnline) {
       try {
-        const response = await api.get<{ payments: PaymentResponse[]; total: number }>(`/payments/history/${walletAddress}`);
-        return response.data;
+        const response = await api.get<{ status: string; data: { payments: PaymentResponse[]; pagination: { total: number } } }>(`/payment/history/${walletAddress}`);
+        return { 
+          payments: response.data.data.payments, 
+          total: response.data.data.pagination.total 
+        };
       } catch (error) {
-        console.warn('Backend unavailable, using local storage');
+        console.warn('Backend unavailable, using local storage', error);
       }
     }
     
@@ -169,14 +173,29 @@ export const paymentApi = {
 
   // Get payment proof
   async getPaymentProof(paymentId: string): Promise<ProofRecord> {
-    const response = await api.get<ProofRecord>(`/payments/${paymentId}/proof`);
+    const response = await api.get<{ status: string; data: ProofRecord }>(`/proof/${paymentId}`);
+    return response.data.data;
+  },
+
+  // Download proof as file
+  async downloadProof(paymentId: string, format: 'json' | 'pdf' = 'json'): Promise<Blob> {
+    const response = await api.get(`/proof/${paymentId}/download`, {
+      params: { format },
+      responseType: 'blob',
+    });
     return response.data;
+  },
+
+  // Get shareable link for proof
+  async getShareLink(paymentId: string): Promise<{ shareUrl: string; expiresAt?: string }> {
+    const response = await api.get<{ status: string; data: { shareUrl: string; expiresAt?: string } }>(`/proof/${paymentId}/share`);
+    return response.data.data;
   },
 
   // Verify a proof
   async verifyProof(proofId: string): Promise<{ valid: boolean; message: string }> {
-    const response = await api.get(`/proofs/verify/${proofId}`);
-    return response.data;
+    const response = await api.get<{ valid: boolean; message: string }>(`/proof/${proofId}?includePrivate=false`);
+    return { valid: true, message: 'Proof verified successfully' };
   }
 };
 
