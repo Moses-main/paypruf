@@ -20,7 +20,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { PaymentResponse, ProofRecord, BLOCK_EXPLORER_URL } from '@/lib/api';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-
+import { downloadProof, generateISOProofRecord, type ProofData } from '@/lib/proofGenerator';
 // Helper function to format wallet address
 export const formatAddress = (address: string) => {
   if (!address) return '';
@@ -116,38 +116,34 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
     }
   };
 
-  const handleDownload = (paymentId: string, format: 'json' | 'xml') => {
-    const proof = proofs[paymentId];
-    if (!proof) return;
-    
-    let content: string;
-    let filename: string;
-    
-    if (format === 'json') {
-      content = JSON.stringify(proof, null, 2);
-      filename = `proof-${paymentId}.json`;
-    } else {
-      content = `<?xml version="1.0" encoding="UTF-8"?>
-<proof>
-  <id>${proof.id}</id>
-  <proofHash>${proof.proofHash}</proofHash>
-  <verificationUrl>${proof.verificationUrl}</verificationUrl>
-  <timestamp>${proof.timestamp}</timestamp>
-</proof>`;
-      filename = `proof-${paymentId}.xml`;
+  const handleDownload = async (paymentId: string, format: 'json' | 'pdf') => {
+    // Find the payment to build a complete proof data object
+    const payment = paymentsArray.find(p => p.id === paymentId);
+    if (!payment) {
+      toast.error('Payment not found');
+      return;
     }
     
-    const blob = new Blob([content], { type: format === 'json' ? 'application/json' : 'application/xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const proofData: ProofData = {
+      id: payment.id,
+      senderAddress: payment.senderAddress,
+      recipientAddress: payment.recipientAddress,
+      amount: payment.amount,
+      currency: payment.currency || 'FLR',
+      memo: payment.memo,
+      status: payment.status,
+      transactionHash: payment.transactionHash,
+      proofHash: payment.proofHash,
+      createdAt: payment.createdAt,
+    };
     
-    toast.success(`Proof downloaded as ${format.toUpperCase()}`);
+    try {
+      await downloadProof(proofData, format);
+      toast.success(`Proof downloaded as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error('Download error:', error);
+      toast.error('Failed to download proof');
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -347,11 +343,11 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  handleDownload(tx.id, 'xml');
+                                  handleDownload(tx.id, 'pdf');
                                 }}
                               >
                                 <FileText className="h-4 w-4 mr-2" />
-                                XML
+                                PDF
                               </Button>
                             </div>
                           </div>
@@ -395,28 +391,32 @@ export const TransactionHistory = ({ className }: TransactionHistoryProps) => {
                         </Link>
                       </Button>
                       
-                      {!proof && tx.status === 'COMPLETED' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await handleGenerateProof(tx.id);
-                          }}
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Shield className="h-4 w-4 mr-2" />
-                              Generate Proof
-                            </>
-                          )}
-                        </Button>
+                      {tx.status === 'COMPLETED' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleDownload(tx.id, 'json');
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            JSON
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              await handleDownload(tx.id, 'pdf');
+                            }}
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            PDF
+                          </Button>
+                        </>
                       )}
                     </div>
                   </div>

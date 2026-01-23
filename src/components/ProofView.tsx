@@ -18,13 +18,15 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
-import api, { BLOCK_EXPLORER_URL } from '@/lib/api';
+import api, { BLOCK_EXPLORER_URL, paymentApi } from '@/lib/api';
+import { downloadProof, generateISOProofRecord, type ProofData } from '@/lib/proofGenerator';
 
-interface ProofData {
+interface ProofDataResponse {
   id: string;
   senderAddress: string;
   recipientAddress: string;
   amount: string;
+  currency?: string;
   memo?: string;
   status: string;
   transactionHash?: string;
@@ -45,7 +47,21 @@ export function ProofView() {
 
   const { data: proof, isLoading, error } = useQuery({
     queryKey: ['proof', proofId],
-    queryFn: async (): Promise<ProofData> => {
+    queryFn: async (): Promise<ProofDataResponse> => {
+      // First check if it's a local payment
+      const localPayments = localStorage.getItem('payproof_payments');
+      if (localPayments) {
+        const payments = JSON.parse(localPayments);
+        const localPayment = payments.find((p: ProofDataResponse) => p.id === proofId);
+        if (localPayment) {
+          return {
+            ...localPayment,
+            acknowledged: false,
+          };
+        }
+      }
+      
+      // Try to fetch from backend
       const response = await api.get(`/proof/${proofId}?includePrivate=true`);
       return response.data.data;
     },
@@ -86,18 +102,21 @@ export function ProofView() {
     if (!proof) return;
 
     try {
-      const response = await api.get(`/proof/${proofId}/download?format=${format}`, {
-        responseType: 'blob',
-      });
+      const proofData: ProofData = {
+        id: proof.id,
+        senderAddress: proof.senderAddress,
+        recipientAddress: proof.recipientAddress,
+        amount: proof.amount,
+        currency: proof.currency || 'FLR',
+        memo: proof.memo,
+        status: proof.status,
+        transactionHash: proof.transactionHash,
+        proofHash: proof.proofHash,
+        flareAnchorTxHash: proof.flareAnchorTxHash,
+        createdAt: proof.createdAt,
+      };
       
-      const mimeType = format === 'json' ? 'application/json' : 'application/pdf';
-      const blob = new Blob([response.data], { type: mimeType });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `payment-proof-${proofId}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadProof(proofData, format);
       
       toast({
         title: 'Download Started',
@@ -106,7 +125,7 @@ export function ProofView() {
     } catch {
       toast({
         title: 'Download Failed',
-        description: 'Could not download proof bundle.',
+        description: 'Could not generate proof bundle.',
         variant: 'destructive',
       });
     }
