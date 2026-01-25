@@ -69,8 +69,11 @@ export const PaymentForm = ({ onSuccess, className }: PaymentFormProps) => {
       toast.error('Payment processing failed');
     },
     onStatusChange: (payment) => {
-      if (payment.proofHash) {
+      if (payment.proofHash && payment.status === 'COMPLETED') {
         setCurrentStep('completed');
+        setCompletedPayment(payment);
+      } else if (payment.status === 'PROCESSING') {
+        setCurrentStep('generating-proof');
       }
     },
   });

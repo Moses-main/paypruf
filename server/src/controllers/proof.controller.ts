@@ -1,8 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../lib/prisma';
+import { PaymentService } from '../services/paymentService';
+import { ProofRailsService } from '../services/proofRailsService';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../utils/logger';
 import QRCode from 'qrcode';
+
+const paymentService = new PaymentService();
 
 /**
  * @route   GET /api/proof/:id
@@ -18,22 +21,9 @@ export const getProofDetails = async (req: Request, res: Response, next: NextFun
       
     const includePrivateDetails = includePrivate === 'true';
 
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        transactionHash: true,
-        senderAddress: includePrivateDetails || undefined,
-        recipientAddress: true,
-        amount: true,
-        currency: true,
-        memo: true,
-        status: true,
-        proofRailsRecordId: true,
-        flareAnchorTxHash: true,
-        createdAt: true,
-      },
-    });
+    logger.info(`Fetching proof details for payment: ${id}`);
+
+    const payment = await paymentService.getPaymentById(id);
 
     if (!payment) {
       throw new ApiError(404, 'Payment not found');
@@ -42,9 +32,9 @@ export const getProofDetails = async (req: Request, res: Response, next: NextFun
     // Generate QR code for sharing
     let qrCode = '';
     try {
-      qrCode = await QRCode.toDataURL(
-        `${process.env.FRONTEND_URL}/proof/${payment.id}`
-      );
+      const host = req.get('host') || 'localhost:3001';
+      const shareUrl = `${req.protocol}://${host.replace(/:\d+$/, '')}:3000/proof/${payment.id}`;
+      qrCode = await QRCode.toDataURL(shareUrl);
     } catch (error) {
       logger.error('Error generating QR code:', { error, paymentId: id });
     }
@@ -58,22 +48,22 @@ export const getProofDetails = async (req: Request, res: Response, next: NextFun
       currency: payment.currency,
       memo: payment.memo,
       status: payment.status,
+      proofHash: payment.proofHash,
+      flareAnchorTxHash: payment.flareAnchorTxHash,
       createdAt: payment.createdAt,
-      proofUrl: payment.proofRailsRecordId
-        ? `${process.env.API_URL}/api/proof/${payment.id}`
-        : null,
-      downloadUrl: payment.proofRailsRecordId
-        ? `${process.env.API_URL}/api/proof/${payment.id}/download`
-        : null,
+      acknowledged: payment.memo?.includes('[ACKNOWLEDGED]') || false,
+      acknowledgedAt: payment.memo?.includes('[ACKNOWLEDGED]') ? payment.updatedAt : null,
+      proofUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}`,
+      downloadUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}/download`,
       flareExplorerUrl: payment.flareAnchorTxHash
         ? `https://flare-explorer.flare.network/tx/${payment.flareAnchorTxHash}`
         : null,
-      qrCode,
+      qrCodeUrl: qrCode,
+      verificationUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}/verify`,
     };
 
     // Only include sender address if explicitly requested and authorized
     if (includePrivateDetails) {
-      // In a real app, you would verify the user has permission to see this
       responseData.senderAddress = payment.senderAddress;
     }
 
@@ -82,6 +72,7 @@ export const getProofDetails = async (req: Request, res: Response, next: NextFun
       data: responseData,
     });
   } catch (error) {
+    logger.error('Error in getProofDetails:', error);
     next(error);
   }
 };
@@ -96,22 +87,7 @@ export const downloadProof = async (req: Request, res: Response, next: NextFunct
     const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
     const format = Array.isArray(req.query.format) ? req.query.format[0] : req.query.format || 'json';
 
-    const payment = await prisma.payment.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        transactionHash: true,
-        senderAddress: true,
-        recipientAddress: true,
-        amount: true,
-        currency: true,
-        memo: true,
-        status: true,
-        proofRailsRecordId: true,
-        flareAnchorTxHash: true,
-        createdAt: true,
-      },
-    });
+    const payment = await paymentService.getPaymentById(id);
 
     if (!payment) {
       throw new ApiError(404, 'Payment not found');
@@ -130,7 +106,7 @@ export const downloadProof = async (req: Request, res: Response, next: NextFunct
       proofRailsRecordId: payment.proofRailsRecordId,
       flareAnchorTxHash: payment.flareAnchorTxHash,
       timestamp: payment.createdAt,
-      proofUrl: `${process.env.API_URL}/api/proof/${payment.id}`,
+      proofUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}`,
       flareExplorerUrl: payment.flareAnchorTxHash
         ? `https://flare-explorer.flare.network/tx/${payment.flareAnchorTxHash}`
         : null,
@@ -153,6 +129,7 @@ export const downloadProof = async (req: Request, res: Response, next: NextFunct
       return res.status(200).json(proofData);
     }
   } catch (error) {
+    logger.error('Error in downloadProof:', error);
     next(error);
   }
 };
@@ -172,10 +149,7 @@ export const generateShareLink = async (req: Request, res: Response, next: NextF
     }
     
     // Verify the payment exists
-    const payment = await prisma.payment.findUnique({
-      where: { id: String(id) },
-      select: { id: true },
-    });
+    const payment = await paymentService.getPaymentById(id);
 
     if (!payment) {
       throw new ApiError(404, 'Payment not found');
@@ -187,7 +161,8 @@ export const generateShareLink = async (req: Request, res: Response, next: NextF
     // 3. Return the full URL with the token
     
     // For now, we'll just return the basic share URL
-    const shareUrl = `${process.env.FRONTEND_URL}/proof/${id}`;
+    const host = req.get('host') || 'localhost:3001';
+    const shareUrl = `${req.protocol}://${host.replace(/:\d+$/, '')}:3000/proof/${id}`;
     
     return res.status(200).json({
       status: 'success',
@@ -197,6 +172,126 @@ export const generateShareLink = async (req: Request, res: Response, next: NextF
       },
     });
   } catch (error) {
+    logger.error('Error in generateShareLink:', error);
+    next(error);
+  }
+};
+
+/**
+ * @route   POST /api/proof/:id/acknowledge
+ * @desc    Acknowledge a payment (for recipients)
+ * @access  Public
+ */
+export const acknowledgePayment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+    const { acknowledgerAddress } = req.body;
+
+    if (!acknowledgerAddress) {
+      throw new ApiError(400, 'Acknowledger address is required');
+    }
+
+    logger.info(`Acknowledging payment ${id} by ${acknowledgerAddress}`);
+
+    const updatedPayment = await paymentService.acknowledgePayment(id, acknowledgerAddress);
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        id: updatedPayment.id,
+        acknowledged: true,
+        acknowledgedAt: updatedPayment.updatedAt,
+      },
+    });
+  } catch (error) {
+    logger.error('Error in acknowledgePayment:', error);
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/proof/:id/verify
+ * @desc    Verify a payment proof
+ * @access  Public
+ */
+export const verifyProof = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    logger.info(`Verifying proof for payment: ${id}`);
+
+    const verification = await paymentService.verifyPaymentProof(id);
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        valid: verification.valid,
+        payment: verification.payment ? {
+          id: verification.payment.id,
+          status: verification.payment.status,
+          amount: verification.payment.amount,
+          currency: verification.payment.currency,
+          createdAt: verification.payment.createdAt,
+        } : null,
+        verification: {
+          anchorVerified: verification.anchorVerified,
+          recordVerified: verification.recordVerified,
+          timestamp: new Date().toISOString(),
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('Error in verifyProof:', error);
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/proof/:id/iso-records
+ * @desc    Get ISO 20022 records for a payment
+ * @access  Private
+ */
+export const getISORecords = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+
+    logger.info(`Fetching ISO records for payment: ${id}`);
+
+    const payment = await paymentService.getPaymentById(id);
+
+    if (!payment) {
+      throw new ApiError(404, 'Payment not found');
+    }
+
+    // Generate ISO records for demonstration
+    const paymentData = {
+      id: payment.id,
+      senderAddress: payment.senderAddress,
+      recipientAddress: payment.recipientAddress,
+      amount: payment.amount,
+      currency: payment.currency,
+      memo: payment.memo || undefined,
+      transactionHash: payment.transactionHash,
+      timestamp: payment.createdAt,
+    };
+
+    const isoRecords = await ProofRailsService.generateAllRecords(paymentData);
+
+    return res.status(200).json({
+      status: 'success',
+      data: {
+        paymentId: payment.id,
+        records: isoRecords.map(record => ({
+          type: record.recordType,
+          id: record.recordId,
+          hash: record.hash,
+          content: record.content,
+        })),
+        generatedAt: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logger.error('Error in getISORecords:', error);
     next(error);
   }
 };

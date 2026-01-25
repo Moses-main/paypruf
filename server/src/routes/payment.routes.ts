@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
-import { submitPayment, getPaymentHistory } from '../controllers/payment.controller';
+import { submitPayment, getPaymentHistory, getPaymentStats } from '../controllers/payment.controller';
 
 const router = Router();
 
@@ -13,9 +13,11 @@ router.post(
     body('recipientAddress').isEthereumAddress().withMessage('Invalid recipient address'),
     body('amount')
       .isString()
-      .matches(/^\d+$/)
-      .withMessage('Amount must be a positive integer'),
+      .matches(/^\d+(\.\d+)?$/)
+      .withMessage('Amount must be a valid number'),
+    body('currency').optional().isString().withMessage('Currency must be a string'),
     body('memo').optional().isString().withMessage('Memo must be a string'),
+    body('transactionHash').isString().withMessage('Transaction hash is required'),
   ],
   validateRequest,
   submitPayment
@@ -24,10 +26,13 @@ router.post(
 // Get payment history for a wallet
 router.get(
   '/history/:walletAddress',
-  [
-    // Add any authentication middleware here if needed
-  ],
   getPaymentHistory
+);
+
+// Get payment statistics
+router.get(
+  '/stats/:walletAddress?',
+  getPaymentStats
 );
 
 export default router;

@@ -1,17 +1,19 @@
 import { Request, Response, NextFunction } from 'express';
 import { ethers } from 'ethers';
-import { v4 as uuidv4 } from 'uuid';
-import prisma from '../lib/prisma';
+import { PaymentService } from '../services/paymentService';
 import { logger } from '../utils/logger';
 import { ApiError } from '../middleware/errorHandler';
-import { processPaymentWithProofRails } from '../services/payment.service';
 
 interface PaymentRequest {
   senderAddress: string;
   recipientAddress: string;
-  amount: string; // In wei or smallest unit of USDT0
+  amount: string;
+  currency?: string;
   memo?: string;
+  transactionHash: string;
 }
+
+const paymentService = new PaymentService();
 
 /**
  * @route   POST /api/payment/submit
@@ -20,7 +22,7 @@ interface PaymentRequest {
  */
 export const submitPayment = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { senderAddress, recipientAddress, amount, memo = '' }: PaymentRequest = req.body;
+    const { senderAddress, recipientAddress, amount, currency, memo, transactionHash }: PaymentRequest = req.body;
 
     // Validate input
     if (!ethers.utils.isAddress(senderAddress) || !ethers.utils.isAddress(recipientAddress)) {
@@ -31,75 +33,42 @@ export const submitPayment = async (req: Request, res: Response, next: NextFunct
       throw new ApiError(400, 'Invalid amount');
     }
 
-    // Create payment record in database with PENDING status
-    // Using a temporary transaction hash that will be updated later
-    const tempTxHash = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    
-    const payment = await prisma.payment.create({
-      data: {
-        senderAddress: senderAddress.toLowerCase(),
-        recipientAddress: recipientAddress.toLowerCase(),
-        amount: amount.toString(),
-        memo,
-        status: 'PENDING',
-        transactionHash: tempTxHash, // Temporary hash that will be updated
-      },
+    if (!transactionHash) {
+      throw new ApiError(400, 'Transaction hash is required');
+    }
+
+    logger.info(`Processing payment submission: ${transactionHash}`);
+
+    // Create payment using the service
+    const payment = await paymentService.createPayment({
+      senderAddress,
+      recipientAddress,
+      amount,
+      currency: currency || 'FLR',
+      memo,
+      transactionHash,
     });
 
-    try {
-      // Process payment and get transaction hash
-      const { txHash, proofId } = await processPaymentWithProofRails({
-        paymentId: payment.id,
-        senderAddress,
-        recipientAddress,
-        amount,
-        memo,
-      });
-
-      // Update payment record with transaction hash and proof ID
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          transactionHash: txHash,
-          proofRailsRecordId: proofId,
-          status: 'COMPLETED',
-        },
-      });
-
-      return res.status(201).json({
-        status: 'success',
-        data: {
-          payment: {
-            id: payment.id,
-            transactionHash: txHash,
-            status: 'COMPLETED',
-          },
-        },
-      });
-    } catch (error) {
-      // Update payment status to FAILED if there's an error
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'FAILED' },
-      });
-
-      throw error; // Let the error handler handle it
-    }
+    return res.status(201).json({
+      status: 'success',
+      data: payment,
+    });
   } catch (error) {
+    logger.error('Error in submitPayment:', error);
     next(error);
   }
 };
 
 /**
- * @route   GET /api/payment/history
+ * @route   GET /api/payment/history/:walletAddress
  * @desc    Get payment history for a wallet
  * @access  Private
  */
 export const getPaymentHistory = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const walletAddress = Array.isArray(req.params.walletAddress) 
-    ? req.params.walletAddress[0] 
-    : req.params.walletAddress;
+      ? req.params.walletAddress[0] 
+      : req.params.walletAddress;
     const { page = 1, limit = 10 } = req.query;
 
     if (!ethers.utils.isAddress(walletAddress)) {
@@ -108,42 +77,15 @@ export const getPaymentHistory = async (req: Request, res: Response, next: NextF
 
     const pageNum = parseInt(page as string, 10) || 1;
     const limitNum = parseInt(limit as string, 10) || 10;
-    const skip = (pageNum - 1) * limitNum;
+    const offset = (pageNum - 1) * limitNum;
 
-    const [payments, total] = await Promise.all([
-      prisma.payment.findMany({
-        where: {
-          OR: [
-            { senderAddress: walletAddress?.toLowerCase() },
-            { recipientAddress: walletAddress?.toLowerCase() },
-          ],
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limitNum,
-        select: {
-          id: true,
-          transactionHash: true,
-          senderAddress: true,
-          recipientAddress: true,
-          amount: true,
-          currency: true,
-          memo: true,
-          status: true,
-          proofRailsRecordId: true,
-          flareAnchorTxHash: true,
-          createdAt: true,
-        },
-      }),
-      prisma.payment.count({
-        where: {
-          OR: [
-            { senderAddress: walletAddress?.toLowerCase() },
-            { recipientAddress: walletAddress?.toLowerCase() },
-          ],
-        },
-      }),
-    ]);
+    logger.info(`Fetching payment history for wallet: ${walletAddress}`);
+
+    const { payments, total } = await paymentService.getPaymentHistory(
+      walletAddress,
+      limitNum,
+      offset
+    );
 
     return res.status(200).json({
       status: 'success',
@@ -151,14 +93,10 @@ export const getPaymentHistory = async (req: Request, res: Response, next: NextF
         payments: payments.map((payment) => ({
           ...payment,
           // Add URLs for frontend
-          proofUrl: payment.proofRailsRecordId
-            ? `${process.env.API_URL}/api/proof/${payment.id}`
-            : null,
-          downloadUrl: payment.proofRailsRecordId
-            ? `${process.env.API_URL}/api/proof/${payment.id}/download`
-            : null,
+          proofUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}`,
+          downloadUrl: `${req.protocol}://${req.get('host')}/api/proof/${payment.id}/download`,
           flareExplorerUrl: payment.flareAnchorTxHash
-            ? `https://flare-explorer.flare.network/tx/${payment.flareAnchorTxHash}`
+            ? `https://coston2-api.flare.network/tx/${payment.flareAnchorTxHash}`
             : null,
         })),
         pagination: {
@@ -170,6 +108,34 @@ export const getPaymentHistory = async (req: Request, res: Response, next: NextF
       },
     });
   } catch (error) {
+    logger.error('Error in getPaymentHistory:', error);
+    next(error);
+  }
+};
+
+/**
+ * @route   GET /api/payment/stats/:walletAddress?
+ * @desc    Get payment statistics
+ * @access  Private
+ */
+export const getPaymentStats = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const walletAddress = Array.isArray(req.params.walletAddress) 
+      ? req.params.walletAddress[0] 
+      : req.params.walletAddress;
+
+    if (walletAddress && !ethers.utils.isAddress(walletAddress)) {
+      throw new ApiError(400, 'Invalid wallet address');
+    }
+
+    const stats = await paymentService.getPaymentStats(walletAddress);
+
+    return res.status(200).json({
+      status: 'success',
+      data: stats,
+    });
+  } catch (error) {
+    logger.error('Error in getPaymentStats:', error);
     next(error);
   }
 };

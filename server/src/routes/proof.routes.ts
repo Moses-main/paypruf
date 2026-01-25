@@ -1,10 +1,13 @@
 import { Router } from 'express';
-import { param, query } from 'express-validator';
+import { param, query, body } from 'express-validator';
 import { validateRequest } from '../middleware/validateRequest';
 import {
   getProofDetails,
   downloadProof,
   generateShareLink,
+  acknowledgePayment,
+  verifyProof,
+  getISORecords,
 } from '../controllers/proof.controller';
 
 const router = Router();
@@ -43,6 +46,33 @@ router.get(
   [param('id').isUUID().withMessage('Invalid payment ID')],
   validateRequest,
   generateShareLink
+);
+
+// Acknowledge a payment
+router.post(
+  '/:id/acknowledge',
+  [
+    param('id').isUUID().withMessage('Invalid payment ID'),
+    body('acknowledgerAddress').isEthereumAddress().withMessage('Invalid acknowledger address'),
+  ],
+  validateRequest,
+  acknowledgePayment
+);
+
+// Verify a payment proof
+router.get(
+  '/:id/verify',
+  [param('id').isUUID().withMessage('Invalid payment ID')],
+  validateRequest,
+  verifyProof
+);
+
+// Get ISO 20022 records for a payment
+router.get(
+  '/:id/iso-records',
+  [param('id').isUUID().withMessage('Invalid payment ID')],
+  validateRequest,
+  getISORecords
 );
 
 export default router;
