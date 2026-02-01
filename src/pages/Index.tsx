@@ -55,6 +55,60 @@ const Index = () => {
           </div>
         </div>
 
+        {/* User Guide */}
+        <div className="glass-card p-6 mb-8 max-w-4xl mx-auto">
+          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-primary">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            How to Use PayProof
+          </h2>
+          <ol className="space-y-3 text-sm text-muted-foreground">
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">1</span>
+              <span>
+                <strong className="font-medium text-foreground">Add Flare Network to your wallet</strong>
+                <br />
+                Visit <a href="https://coston2-explorer.flare.network/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Flare Explorer</a>, scroll down and click "Add Network" to add Flare Network to your wallet.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">2</span>
+              <span>
+                <strong className="font-medium text-foreground">Get Test Tokens</strong>
+                <br />
+                Go to <a href="https://faucet.flare.network/coston2" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Flare Faucet</a> to get C2FLR tokens for transactions on the Coston2 testnet.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">3</span>
+              <span>
+                <strong className="font-medium text-foreground">Connect Wallet</strong>
+                <br />
+                Click "Connect Wallet" at the top right and authorize the connection in your wallet.
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">4</span>
+              <span>
+                <strong className="font-medium text-foreground">Send Payment</strong>
+                <br />
+                Enter the recipient's wallet address, amount, and any additional details, then click "Send Payment".
+              </span>
+            </li>
+            <li className="flex gap-3">
+              <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">5</span>
+              <span>
+                <strong className="font-medium text-foreground">View & Share Receipt</strong>
+                <br />
+                After the transaction is confirmed, you can view, download, or share the payment receipt using the provided link.
+              </span>
+            </li>
+          </ol>
+        </div>
+
         {/* Main Content */}
         <div className="grid lg:grid-cols-2 gap-6 max-w-5xl mx-auto">
           <PaymentForm />
