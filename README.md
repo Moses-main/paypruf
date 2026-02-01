@@ -43,6 +43,14 @@ It creates immutable, shareable payment confirmations to reduce disputes and amb
 * 🛡️ **Immutable Anchoring**
   Proof hashes are anchored on Flare for auditability.
 
+## 🎥 Video Demonstration
+
+Watch the application in action:
+
+[![PayPruf Demo](https://img.youtube.com/vi/DAzuCHnbZLg/0.jpg)](https://www.youtube.com/watch?v=DAzuCHnbZLg)
+
+*Click the image above to watch the full demo on YouTube*
+
 ---
 
 ## 🏗 Architecture
